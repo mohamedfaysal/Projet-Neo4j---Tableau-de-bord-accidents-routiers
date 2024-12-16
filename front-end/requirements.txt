@@ -1,0 +1,5 @@
+streamlit
+streamlit_option_menu
+neo4j
+plotly
+folium
