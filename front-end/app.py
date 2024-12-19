@@ -9,7 +9,8 @@ from folium.plugins import MarkerCluster
 # Connexion à la base de données Neo4j
 uri = "bolt://localhost:7687"
 username = "neo4j"
-password = "12345678"
+password = "password"
+#password ="12345678"
 
 # Connexion à Neo4j
 def get_neo4j_session():
@@ -568,7 +569,87 @@ def contact():
 
     local_css("./Style/file.css")
 
+#-------------------------------------
+def run_gds_algorithm(algorithm, params):
+    """
+    Exécute un algorithme GDS sur la base Neo4j.
+    """
+    with driver.session() as session:
+        query = f"""
+        CALL gds.{algorithm}({params})
+        YIELD *
+        RETURN *
+        """
+        result = session.run(query)
+        return [record.data() for record in result]
 
+def gds_tab():
+    """
+    Ajoute un onglet pour exécuter des algorithmes de GDS sur les données.
+    """
+    st.title("Analyse Graph Data Science")
+    st.write("Utilisez cette section pour exécuter des algorithmes de Data Science sur le graphe.")
+
+    # Sélection de l'algorithme
+    algo_choice = st.selectbox(
+        "Choisissez un algorithme GDS",
+        ["PageRank", "Shortest Path", "Node Similarity"]
+    )
+
+    # Paramètres automatiques basés sur le choix de l'algorithme
+    if algo_choice == "PageRank":
+        params = """
+        {
+            "nodeProjection": "Lieu",
+            "relationshipProjection": {
+                "A_LIEU": {
+                    "type": "A_LIEU",
+                    "orientation": "UNDIRECTED"
+                }
+            },
+            "maxIterations": 20,
+            "dampingFactor": 0.85
+        }
+        """
+    elif algo_choice == "Shortest Path":
+        start_node = st.text_input("Identifiant du lieu de départ", value="Lieu1")
+        end_node = st.text_input("Identifiant du lieu de destination", value="Lieu2")
+        params = f"""
+        {{
+            "startNode": gds.util.asNode('{start_node}'),
+            "endNode": gds.util.asNode('{end_node}'),
+            "nodeProjection": "Lieu",
+            "relationshipProjection": {{
+                "A_LIEU": {{
+                    "type": "A_LIEU",
+                    "orientation": "UNDIRECTED"
+                }}
+            }}
+        }}
+        """
+    elif algo_choice == "Node Similarity":
+        params = """
+        {
+            "nodeProjection": "Vehicule",
+            "relationshipProjection": {
+                "IMPLIQUE_A": {
+                    "type": "IMPLIQUE_A",
+                    "orientation": "UNDIRECTED"
+                }
+            },
+            "similarityCutoff": 0.5,
+            "degreeCutoff": 1
+        }
+        """
+    
+    # Bouton pour exécuter
+    if st.button(f"Exécuter {algo_choice}"):
+        try:
+            results = run_gds_algorithm(algo_choice.lower(), params)
+            st.success(f"Résultats de {algo_choice} :")
+            st.json(results)
+        except Exception as e:
+            st.error(f"Erreur lors de l'exécution : {e}")
 
 # Interface avec onglets
 def main():
@@ -577,7 +658,7 @@ def main():
 
     st.title("Tableau de Bord des Accidents")
     
-    selected_tab = ui.tabs(options=["Accueil", "Accidents", "Véhicules", "Usagers", "Contact"], default_value="Accueil", key="tabs")
+    selected_tab = ui.tabs(options=["Accueil", "Accidents", "Véhicules", "Usagers", "Contact","Data science"], default_value="Accueil", key="tabs")
     
     if selected_tab == "Accueil":
         accueil()
@@ -589,6 +670,8 @@ def main():
         usagers()
     elif selected_tab == "Contact":
         contact()
+    elif selected_tab == "Data science":
+        gds_tab()
 
 if __name__ == "__main__":
     main()
